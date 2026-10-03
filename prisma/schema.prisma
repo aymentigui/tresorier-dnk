@@ -1,0 +1,174 @@
+datasource db {
+  provider = "mysql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// --- ENUMS (القوائم الثابتة) ---
+enum ChequeType {
+  BANQUE
+  SIMPLE
+}
+
+enum FraisType {
+  TAX
+  VIREMENT
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  IMPORT
+  EXPORT
+  LOGIN
+  LOGOUT
+  LOGIN_FAILED
+  PASSWORD_CHANGE
+  BLOCK
+  UNBLOCK
+  ACTIVATE_SOLDE
+}
+
+// --- MODELS (الجداول) ---
+
+model User {
+  id                   String    @id @default(cuid())
+  username             String    @unique
+  email                String?
+  passwordHash         String
+  fullName             String
+  isBlocked            Boolean   @default(false)
+  failedLoginAttempts  Int       @default(0)
+  lockedUntil          DateTime?
+  mustChangePassword   Boolean   @default(true)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  roles                Role[]    // علاقة متعدد لمتعدد مع الأدوار
+  auditLogs            AuditLog[]
+}
+
+model Role {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  description String?
+  users       User[]       
+  permissions Permission[] 
+}
+
+model Permission {
+  id       String  @id @default(cuid())
+  code     String  @unique // مثال: "cheque:create"
+  label    String
+  resource String
+  roles    Role[]  
+}
+
+model Fournisseur {
+  id        String   @id @default(cuid())
+  nom       String   @unique
+  activite  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  cheques   Cheque[]
+}
+
+model Client {
+  id            String         @id @default(cuid())
+  nom           String         @unique
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  encaissements Encaissement[]
+}
+
+model Cheque {
+  id               String      @id @default(cuid())
+  numeroCheque     String
+  montant          Decimal     @db.Decimal(15, 2)
+  reference        String?
+  dateCreation     DateTime    @db.Date
+  dateDecaissement DateTime?   @db.Date
+  type             ChequeType
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  fournisseurId    String
+  fournisseur      Fournisseur @relation(fields: [fournisseurId], references: [id])
+
+  @@index([dateCreation])
+  @@index([dateDecaissement])
+  @@index([fournisseurId])
+}
+
+model Encaissement {
+  id               String    @id @default(cuid())
+  montant          Decimal   @db.Decimal(15, 2)
+  dateCreation     DateTime  @db.Date
+  dateEncaissement DateTime? @db.Date
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  clientId         String
+  client           Client    @relation(fields: [clientId], references: [id])
+
+  @@index([dateCreation])
+  @@index([dateEncaissement])
+  @@index([clientId])
+}
+
+model LigneCredit {
+  id           String   @id @default(cuid())
+  montant      Decimal  @db.Decimal(15, 2)
+  dateCreation DateTime @db.Date
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([dateCreation])
+}
+
+model Frais {
+  id           String    @id @default(cuid())
+  nom          String
+  montant      Decimal   @db.Decimal(15, 2)
+  dateCreation DateTime  @db.Date
+  type         FraisType
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([dateCreation])
+}
+
+model SoldeBanque {
+  id           String   @id @default(cuid())
+  montant      Decimal  @db.Decimal(15, 2)
+  dateCreation DateTime @db.Date
+  active       Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([dateCreation])
+  @@index([active])
+}
+
+model AuditLog {
+  id          String      @id @default(cuid())
+  action      AuditAction
+  entity      String
+  entityId    String?
+  description String
+  before      Json?
+  after       Json?
+  ipAddress   String?
+  userAgent   String?
+  username    String? // نحتفظ باسم المستخدم حتى لو تم حذفه لاحقاً
+  createdAt   DateTime    @default(now())
+
+  userId      String?
+  user        User?       @relation(fields: [userId], references: [id])
+
+  @@index([createdAt])
+  @@index([userId])
+}
