@@ -26,6 +26,7 @@ type Encaissement = {
   dateEncaissement: Date | null;
   clientId: string;
   client: { nom: string };
+  reference: string | null;
 };
 
 type Summary = {
@@ -90,6 +91,7 @@ export default function EncaissementsClient({
     setTimeout(() => {
       (document.getElementById('montant') as HTMLInputElement).value = String(encaissement.montant);
       (document.getElementById('dateCreation') as HTMLInputElement).value = new Date(encaissement.dateCreation).toISOString().split('T')[0];
+      (document.getElementById('reference') as HTMLInputElement).value = encaissement.reference || '';
       if (encaissement.dateEncaissement) {
         (document.getElementById('dateEncaissement') as HTMLInputElement).value = new Date(encaissement.dateEncaissement).toISOString().split('T')[0];
       }
@@ -190,6 +192,11 @@ export default function EncaissementsClient({
       accessorKey: 'montant',
       header: 'Montant',
       cell: (info) => <span className="font-bold tabular-nums text-slate-900">{formatMontant(info.getValue())}</span>,
+    },
+    {
+      accessorKey: 'reference',
+      header: 'Référence',
+      cell: (info) => <span className="font-bold tabular-nums text-slate-900">{info.row.original.reference|| '-'}</span>,
     },
     {
       id: 'statut',
@@ -363,6 +370,10 @@ export default function EncaissementsClient({
                 <label className="block text-sm font-medium text-slate-700 mb-1">Montant (DA) *</label>
                 <Input type="number" step="0.01" id="montant" name="montant" required placeholder="0.00" />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Référence (Optionnel)</label>
+                <Input id="reference" name="reference" placeholder="Virement N°..." />
+              </div>
               
               <div className="flex flex-col">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Client *</label>
@@ -405,7 +416,7 @@ export default function EncaissementsClient({
                   <Input type="date" id="dateCreation" name="dateCreation" required defaultValue={new Date().toISOString().split('T')[0]} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Date d'encaissement</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Date d&aposencaissement</label>
                   <Input type="date" id="dateEncaissement" name="dateEncaissement" />
                   <p className="text-[10px] text-slate-400 mt-1">Laissez vide si "En attente"</p>
                 </div>
@@ -422,7 +433,7 @@ export default function EncaissementsClient({
           </DialogContent>
         </Dialog>
 
-        {/* Modal d'Importation */}
+        {/* Modal d&aposimportation */}
         <Dialog open={isImportOpen} onOpenChange={(open) => {
           setIsImportOpen(open);
           if(!open) { setImportFile(null); setPreviewData(null); }

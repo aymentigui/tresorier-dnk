@@ -17,7 +17,7 @@ export default async function FraisPage({
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Frais & Taxes</h1>
-          <p className="text-slate-500 mt-1">Gérez vos sorties d'argent diverses.</p>
+          <p className="text-slate-500 mt-1">Gérez vos sorties d&aposargent diverses.</p>
         </div>
       </div>
       

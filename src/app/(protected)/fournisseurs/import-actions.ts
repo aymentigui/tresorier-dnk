@@ -8,18 +8,17 @@ import ExcelJS from 'exceljs';
 import { writeAudit } from '@/lib/audit';
 import { revalidatePath } from 'next/cache';
 
-// 1. Validation w Preview ta3 le fichier
-export async function previewExcelImport(formData: FormData) {
-  await requirePermission('fournisseur:import');
+export async function previewFournisseurImport(formData: FormData) {
+  await requirePermission('fournisseur:create');
   
   const file = formData.get('file') as File;
   if (!file) return { error: "Aucun fichier sélectionné." };
 
-  const buffer = Buffer.from(await file.arrayBuffer());
+  const arrayBuffer = await file.arrayBuffer();
   const workbook = new ExcelJS.Workbook();
-  
+
   try {
-    await workbook.xlsx.load(buffer);
+    await workbook.xlsx.load(arrayBuffer);
   } catch (e) {
     return { error: "Fichier Excel invalide." };
   }
@@ -27,31 +26,41 @@ export async function previewExcelImport(formData: FormData) {
   const worksheet = workbook.getWorksheet(1);
   if (!worksheet) return { error: "La feuille de calcul est vide." };
 
-  const validRows: { nom: string; activite: string }[] = [];
+  const existingFournisseurs = await prisma.fournisseur.findMany({ select: { nom: true } });
+  const existingNames = new Set(existingFournisseurs.map(f => f.nom.toLowerCase().trim()));
+
+  const validRows: { nom: string; activite: string | null; seuilActive: boolean; seuil: number }[] = [];
   const errors: { line: number; message: string }[] = [];
 
-  // L'itération tbda men la ligne 2 (la ligne 1 hiya les titres)
   worksheet.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return; // Skip header
     
+    // Colonnes : Nom | Activité | Seuil Activé (Oui/Non) | Montant Seuil
     const nom = row.getCell(1).text?.trim();
-    const activite = row.getCell(2).text?.trim() || '';
+    const activite = row.getCell(2).text?.trim() || null;
+    const seuilActiveStr = row.getCell(3).text?.trim().toLowerCase();
+    const seuilRaw = row.getCell(4).value;
+
+    const seuilActive = seuilActiveStr === 'oui' || seuilActiveStr === 'vrai' || seuilActiveStr === 'true';
+    const seuil = Number(seuilRaw) || 0;
 
     if (!nom) {
-      errors.push({ line: rowNumber, message: "Le nom est obligatoire." });
-    } else if (nom.length < 2) {
-      errors.push({ line: rowNumber, message: "Le nom est trop court." });
+      errors.push({ line: rowNumber, message: "Le Nom du fournisseur est obligatoire." });
+    } else if (existingNames.has(nom.toLowerCase())) {
+      errors.push({ line: rowNumber, message: `Le fournisseur '${nom}' existe déjà dans la base.` });
+    } else if (seuilActive && seuil <= 0) {
+      errors.push({ line: rowNumber, message: "Le montant du seuil doit être supérieur à 0 si le seuil est activé." });
     } else {
-      validRows.push({ nom, activite });
+      validRows.push({ nom, activite, seuilActive, seuil });
+      existingNames.add(nom.toLowerCase()); // لمنع التكرار داخل نفس ملف الإكسيل
     }
   });
 
   return { validRows, errors, total: validRows.length + errors.length };
 }
 
-// 2. L'importation finale f la Base de données
-export async function confirmImport(validRows: { nom: string; activite: string }[]) {
-  await requirePermission('fournisseur:import');
+export async function confirmFournisseurImport(validRows: { nom: string; activite: string | null; seuilActive: boolean; seuil: number }[]) {
+  await requirePermission('fournisseur:create');
   const cookieStore = await cookies();
   const session = await verifySession(cookieStore.get('session')?.value);
 
@@ -60,15 +69,18 @@ export async function confirmImport(validRows: { nom: string; activite: string }
 
   for (const row of validRows) {
     try {
-      const exists = await prisma.fournisseur.findUnique({ where: { nom: row.nom } });
-      if (!exists) {
-        await prisma.fournisseur.create({ data: { nom: row.nom, activite: row.activite } });
-        successCount++;
-      } else {
-        dbErrors.push(`Le fournisseur "${row.nom}" existe déjà.`);
-      }
+      await prisma.fournisseur.create({ 
+        data: { 
+          nom: row.nom,
+          activite: row.activite,
+          seuilActive: row.seuilActive,
+          seuil: row.seuilActive ? row.seuil : null,
+          cumulMontant: 0 // يبدأ دائما بـ 0
+        } 
+      });
+      successCount++;
     } catch (e) {
-      dbErrors.push(`Erreur d'insertion pour "${row.nom}".`);
+      dbErrors.push(`Erreur pour le fournisseur '${row.nom}'.`);
     }
   }
 

@@ -10,7 +10,8 @@ import { revalidatePath } from 'next/cache';
 
 const ligneCreditSchema = z.object({
   montant: z.coerce.number().positive("Le montant doit être supérieur à 0"),
-  dateCreation: z.string().min(1, "La date est requise"),
+  dateCreation: z.string().min(1, "La date de début est requise"),
+  dateFin: z.string().optional().nullable(),
 });
 
 // 1. قراءة خطوط الائتمان
@@ -44,15 +45,18 @@ export async function createLigneCredit(formData: FormData) {
 
   const montant = formData.get('montant');
   const dateCreation = formData.get('dateCreation') as string;
+  const dateFin = formData.get('dateFin') as string;
 
-  const validation = ligneCreditSchema.safeParse({ montant, dateCreation });
+  const validation = ligneCreditSchema.safeParse({ montant, dateCreation, dateFin });
   if (!validation.success) return { error: validation.error.issues[0].message };
 
   try {
     const newLigne = await prisma.ligneCredit.create({
       data: {
         montant: validation.data.montant,
-        dateCreation: new Date(validation.data.dateCreation)
+        dateCreation: new Date(validation.data.dateCreation),
+        dateFin: validation.data.dateFin ? new Date(validation.data.dateFin) : null,
+        isActive: true // يتم تفعيلها افتراضيا عند الإنشاء
       }
     });
 
@@ -60,7 +64,7 @@ export async function createLigneCredit(formData: FormData) {
       action: 'CREATE',
       entity: 'LigneCredit',
       entityId: newLigne.id,
-      description: `Création d'une ligne de crédit de ${montant} DA`,
+      description: `Création d&aposune ligne de crédit de ${montant} DA`,
       userId: session?.userId,
       username: session?.username,
       after: newLigne
@@ -81,8 +85,9 @@ export async function updateLigneCredit(id: string, formData: FormData) {
 
   const montant = formData.get('montant');
   const dateCreation = formData.get('dateCreation') as string;
+  const dateFin = formData.get('dateFin') as string;
 
-  const validation = ligneCreditSchema.safeParse({ montant, dateCreation });
+  const validation = ligneCreditSchema.safeParse({ montant, dateCreation, dateFin });
   if (!validation.success) return { error: validation.error.issues[0].message };
 
   try {
@@ -93,7 +98,8 @@ export async function updateLigneCredit(id: string, formData: FormData) {
       where: { id },
       data: {
         montant: validation.data.montant,
-        dateCreation: new Date(validation.data.dateCreation)
+        dateCreation: new Date(validation.data.dateCreation),
+        dateFin: validation.data.dateFin ? new Date(validation.data.dateFin) : null,
       }
     });
 
@@ -141,5 +147,33 @@ export async function deleteLigneCredit(id: string) {
     return { success: true };
   } catch (error) {
     return { error: "Erreur lors de la suppression." };
+  }
+}
+
+// 5. تفعيل / تعطيل خط ائتمان
+export async function toggleLigneCreditStatus(id: string, currentStatus: boolean) {
+  await requirePermission('ligneCredit:activate');
+  const cookieStore = await cookies();
+  const session = await verifySession(cookieStore.get('session')?.value);
+
+  try {
+    const updated = await prisma.ligneCredit.update({
+      where: { id },
+      data: { isActive: !currentStatus }
+    });
+
+    await writeAudit({
+      action: 'UPDATE',
+      entity: 'LigneCredit',
+      entityId: id,
+      description: `${!currentStatus ? 'Activation' : 'Désactivation'} de la ligne de crédit`,
+      userId: session?.userId,
+      username: session?.username,
+    });
+
+    revalidatePath('/lignes-credit');
+    return { success: true, isActive: updated.isActive };
+  } catch (error) {
+    return { error: "Erreur lors du changement de statut." };
   }
 }

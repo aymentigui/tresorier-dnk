@@ -27,7 +27,7 @@ export default async function LogsPage({
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Journal d'audit</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Journal d&aposaudit</h1>
           <p className="text-slate-500 mt-1">Traçabilité complète des actions effectuées sur le système.</p>
         </div>
       </div>

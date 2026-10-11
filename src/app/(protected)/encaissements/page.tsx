@@ -26,7 +26,7 @@ export default async function EncaissementsPage({
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Encaissements</h1>
-          <p className="text-slate-500 mt-1">Gérez vos entrées d'argent et règlements clients.</p>
+          <p className="text-slate-500 mt-1">Gérez vos entrées d&aposargent et règlements clients.</p>
         </div>
       </div>
       

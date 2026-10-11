@@ -6,7 +6,8 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 
 export async function logoutAction() {
-  const cookie = cookies().get('session')?.value;
+  const cookieStore = await cookies();
+  const cookie = cookieStore.get('session')?.value;
   const session = await verifySession(cookie);
 
   if (session) {

@@ -1,10 +1,10 @@
 import { getDashboardData } from './actions';
 import { FluxChart, RepartitionChart } from './DashboardCharts';
-import DashboardControls from './DashboardControls'; // المكون الجديد
+import DashboardControls from './DashboardControls';
 import { verifySession } from '@/lib/session';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
-import { Wallet, TrendingUp, AlertCircle, Users, Building, ArrowRight } from 'lucide-react';
+import { Wallet, TrendingUp, AlertCircle, Users, Building, ArrowRight, AlertTriangle } from 'lucide-react';
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ start?: string; end?: string }> }) {
   const cookieStore = await cookies();
@@ -100,7 +100,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
       {/* الجزء السفلي */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm lg:col-span-2 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm lg:col-span-2 overflow-hidden self-start">
           <div className="p-5 border-b border-slate-100 flex justify-between items-center">
             <h2 className="text-base font-bold text-slate-900">Derniers chèques enregistrés</h2>
             <Link href="/cheques" className="text-sm font-medium text-emerald-600 hover:text-emerald-700 flex items-center gap-1">Voir tout <ArrowRight size={14} /></Link>
@@ -117,7 +117,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                     <td className="px-5 py-3 text-slate-600">{cheque.fournisseur.nom}</td>
                     <td className="px-5 py-3 font-semibold tabular-nums">{formatMoney(Number(cheque.montant))}</td>
                     <td className="px-5 py-3">
-                      {cheque.dateDecaissement ? <span className="inline-flex px-2 py-1 rounded-md text-[10px] font-medium bg-emerald-100 text-emerald-700">Décaissé</span> : <span className="inline-flex px-2 py-1 rounded-md text-[10px] font-medium bg-amber-100 text-amber-700">En circulation</span>}
+                      {cheque.statut === 'ANNULE' ? (
+                        <span className="inline-flex px-2 py-1 rounded-md text-[10px] font-medium bg-red-100 text-red-700">Annulé</span>
+                      ) : cheque.dateDecaissement ? (
+                        <span className="inline-flex px-2 py-1 rounded-md text-[10px] font-medium bg-emerald-100 text-emerald-700">Décaissé</span>
+                      ) : (
+                        <span className="inline-flex px-2 py-1 rounded-md text-[10px] font-medium bg-amber-100 text-amber-700">En circulation</span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -125,16 +131,65 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             </table>
           </div>
         </div>
-        <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-sm">
-          <h3 className="text-sm font-bold text-slate-900 mb-4">Indicateurs de la base</h3>
-          <div className="space-y-4">
-            <div>
-              <div className="flex justify-between text-sm mb-1"><span className="text-slate-500 flex items-center gap-1"><Users size={14} /> Clients</span><span className="font-bold text-slate-900">{data.kpis.clientsCount}</span></div>
-              <div className="w-full bg-slate-100 rounded-full h-1.5"><div className="bg-indigo-500 h-1.5 rounded-full" style={{ width: '70%' }}></div></div>
+
+        {/* العمود الجانبي: المؤشرات والتنبيهات */}
+        <div className="space-y-6">
+          {/* تنبيهات العتبة */}
+          {(data.alerts.fournisseurs.length > 0 || data.alerts.contrats.length > 0) && (
+            <div className="bg-red-50/50 border border-red-100 p-5 rounded-2xl shadow-sm">
+              <h3 className="text-sm font-bold text-red-900 mb-4 flex items-center gap-2">
+                <AlertTriangle size={18} className="text-red-600" /> Seuils Critiques (≥ 90%)
+              </h3>
+              <div className="space-y-3">
+                {data.alerts.fournisseurs.map(f => (
+                  <Link href={`/fournisseurs/${f.id}`} key={f.id} className="block bg-white p-3 rounded-xl border border-red-100 hover:border-red-300 transition-colors shadow-sm">
+                    <div className="flex justify-between items-start mb-1">
+                      <div>
+                        <p className="text-xs font-bold text-slate-900 truncate max-w-[150px]">{f.nom}</p>
+                        <p className="text-[10px] text-slate-500">Seuil Fournisseur</p>
+                      </div>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${f.pct >= 100 ? 'bg-red-600 text-white' : 'bg-red-100 text-red-700'}`}>
+                        {f.pct.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-1.5 mt-2">
+                      <div className="bg-red-500 h-1.5 rounded-full" style={{ width: `${Math.min(f.pct, 100)}%` }}></div>
+                    </div>
+                  </Link>
+                ))}
+                
+                {data.alerts.contrats.map(c => (
+                  <Link href={`/contrats`} key={c.id} className="block bg-white p-3 rounded-xl border border-amber-100 hover:border-amber-300 transition-colors shadow-sm">
+                    <div className="flex justify-between items-start mb-1">
+                      <div>
+                        <p className="text-xs font-bold text-slate-900">Contrat {c.numero}</p>
+                        <p className="text-[10px] text-slate-500 truncate max-w-[120px]">{c.fournisseur}</p>
+                      </div>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${c.pct >= 100 ? 'bg-amber-600 text-white' : 'bg-amber-100 text-amber-700'}`}>
+                        {c.pct.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-1.5 mt-2">
+                      <div className="bg-amber-500 h-1.5 rounded-full" style={{ width: `${Math.min(c.pct, 100)}%` }}></div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
             </div>
-            <div>
-              <div className="flex justify-between text-sm mb-1"><span className="text-slate-500 flex items-center gap-1"><Building size={14} /> Fournisseurs</span><span className="font-bold text-slate-900">{data.kpis.fournisseursCount}</span></div>
-              <div className="w-full bg-slate-100 rounded-full h-1.5"><div className="bg-blue-500 h-1.5 rounded-full" style={{ width: '45%' }}></div></div>
+          )}
+
+          {/* المؤشرات العامة */}
+          <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-sm">
+            <h3 className="text-sm font-bold text-slate-900 mb-4">Indicateurs de la base</h3>
+            <div className="space-y-4">
+              <div>
+                <div className="flex justify-between text-sm mb-1"><span className="text-slate-500 flex items-center gap-1"><Users size={14} /> Clients</span><span className="font-bold text-slate-900">{data.kpis.clientsCount}</span></div>
+                <div className="w-full bg-slate-100 rounded-full h-1.5"><div className="bg-indigo-500 h-1.5 rounded-full" style={{ width: '70%' }}></div></div>
+              </div>
+              <div>
+                <div className="flex justify-between text-sm mb-1"><span className="text-slate-500 flex items-center gap-1"><Building size={14} /> Fournisseurs</span><span className="font-bold text-slate-900">{data.kpis.fournisseursCount}</span></div>
+                <div className="w-full bg-slate-100 rounded-full h-1.5"><div className="bg-blue-500 h-1.5 rounded-full" style={{ width: '45%' }}></div></div>
+              </div>
             </div>
           </div>
         </div>

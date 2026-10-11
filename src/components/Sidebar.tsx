@@ -4,7 +4,9 @@ import { usePathname } from 'next/navigation';
 import { 
   LayoutDashboard, CreditCard, ArrowDownToLine, 
   Users, Briefcase, List, FileText, Building, 
-  ShieldCheck, History, Settings 
+  ShieldCheck, History, Settings, 
+  FileSignature,
+  Receipt
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -17,7 +19,10 @@ const menuItems = [
     { name: 'Clients', href: '/clients', icon: Users },
     { name: 'Lignes de crédit', href: '/lignes-credit', icon: Briefcase },
     { name: 'Frais', href: '/frais', icon: List },
+    { name: "Bons de Commande", href: "/bons-commande", icon: FileText },
     { name: 'Soldes bancaires', href: '/soldes', icon: FileText },
+    { name: "Contrats", href: "/contrats", icon: FileSignature },
+    { name: "Factures", href: "/factures", icon: Receipt }
   ]},
   { group: 'ADMINISTRATION', items: [
     { name: 'Utilisateurs', href: '/utilisateurs', icon: ShieldCheck },

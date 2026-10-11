@@ -21,6 +21,9 @@ async function main() {
     "role",
     "log",
     "dashboard",
+    "bonCommande",
+    "contrat",
+    "facture",
   ]
 
   const standardActions = [
@@ -50,13 +53,52 @@ async function main() {
     },
     {
       code: "log:view",
-      label: "Voir le journal d'audit",
+      label: "Voir le journal d&aposaudit",
       resource: "log",
     },
     {
       code: "dashboard:view",
       label: "Voir le tableau de bord",
       resource: "dashboard",
+    },
+
+    {
+      code: "cheque:cancel",
+      label: "Annuler un chèque",
+      resource: "cheque",
+    },
+    {
+      code: "cheque:reactivate",
+      label: "Réactiver un chèque annulé",
+      resource: "cheque",
+    },
+
+    {
+      code: "ligneCredit:activate",
+      label: "Activer/Désactiver une ligne de crédit",
+      resource: "ligneCredit",
+    },
+
+    {
+      code: "contrat:renew",
+      label: "Renouveler un contrat",
+      resource: "contrat",
+    },
+    {
+      code: "contrat:seuil",
+      label: "Gérer le seuil d&aposun contrat",
+      resource: "contrat",
+    },
+
+    {
+      code: "fournisseur:seuil",
+      label: "Gérer le seuil d&aposun fournisseur",
+      resource: "fournisseur",
+    },
+    {
+      code: "fournisseur:profile",
+      label: "Accéder au profil complet 360° du fournisseur",
+      resource: "fournisseur",
     },
   ]
 
@@ -78,9 +120,7 @@ async function main() {
 
   for (const permission of allPermissions) {
     await prisma.permission.upsert({
-      where: {
-        code: permission.code,
-      },
+      where: { code: permission.code },
       update: {
         label: permission.label,
         resource: permission.resource,
@@ -111,24 +151,20 @@ async function main() {
     where: {
       name: "Administrateur",
     },
-
     update: {
       description: "Accès total au système",
-
       permissions: {
-        set: dbPermissions.map((permission) => ({
-          id: permission.id,
+        set: dbPermissions.map((p) => ({
+          id: p.id,
         })),
       },
     },
-
     create: {
       name: "Administrateur",
       description: "Accès total au système",
-
       permissions: {
-        connect: dbPermissions.map((permission) => ({
-          id: permission.id,
+        connect: dbPermissions.map((p) => ({
+          id: p.id,
         })),
       },
     },
@@ -140,35 +176,29 @@ async function main() {
   // 4. UTILISATEUR ADMIN
   // ============================================================
 
-  const password =
-    process.env.SEED_ADMIN_PASSWORD || "Admin123!"
-
+  const password = process.env.SEED_ADMIN_PASSWORD || "Admin123!"
   const passwordHash = await bcrypt.hash(password, 10)
 
-  console.log("👤 Création de l'utilisateur admin...")
+  console.log("👤 Création de l&aposutilisateur admin...")
 
   const adminUser = await prisma.user.upsert({
     where: {
       username: "admin",
     },
-
     update: {
       fullName: "Administrateur Système",
-      mustChangePassword: true,
-
+      mustChangePassword: false,
       roles: {
         connect: {
           id: adminRole.id,
         },
       },
     },
-
     create: {
       username: "admin",
       fullName: "Administrateur Système",
       passwordHash,
-      mustChangePassword: true,
-
+      mustChangePassword: false,
       roles: {
         connect: {
           id: adminRole.id,
@@ -196,5 +226,8 @@ main()
   .catch((error) => {
     console.error("❌ Erreur pendant le seeding :")
     console.error(error)
-    process.exit(1)
+    process.exitCode = 1
+  })
+  .finally(async () => {
+    await prisma.$disconnect()
   })

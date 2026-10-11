@@ -220,7 +220,7 @@ export default function LogsClient({
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[700px]">
           <DialogHeader>
-            <DialogTitle>Détails de l'action</DialogTitle>
+            <DialogTitle>Détails de l&aposaction</DialogTitle>
           </DialogHeader>
           
           {selectedLog && (

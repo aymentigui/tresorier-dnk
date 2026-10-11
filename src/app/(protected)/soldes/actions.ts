@@ -70,7 +70,7 @@ export async function createSolde(formData: FormData) {
       action: 'CREATE',
       entity: 'SoldeBanque',
       entityId: newSolde.id,
-      description: `Création d'un nouveau solde de ${newSolde.montant} DA`,
+      description: `Création d&aposun nouveau solde de ${newSolde.montant} DA`,
       userId: session?.userId,
       username: session?.username,
       after: newSolde
@@ -118,7 +118,7 @@ export async function activateSolde(id: string) {
     revalidatePath('/soldes');
     return { success: true };
   } catch (error) {
-    return { error: "Erreur lors de l'activation." };
+    return { error: "Erreur lors de l&aposactivation." };
   }
 }
 
@@ -131,7 +131,7 @@ export async function deleteSolde(id: string) {
   try {
     const solde = await prisma.soldeBanque.findUnique({ where: { id } });
     if (!solde) return { error: "Solde introuvable." };
-    if (solde.active) return { error: "Impossible de supprimer le solde actif. Activez un autre solde d'abord." };
+    if (solde.active) return { error: "Impossible de supprimer le solde actif. Activez un autre solde d&aposabord." };
 
     await prisma.soldeBanque.delete({ where: { id } });
 

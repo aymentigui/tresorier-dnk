@@ -15,11 +15,11 @@ export async function previewExcelImport(formData: FormData) {
   const file = formData.get('file') as File;
   if (!file) return { error: "Aucun fichier sélectionné." };
 
-  const buffer = Buffer.from(await file.arrayBuffer());
+  const arrayBuffer = await file.arrayBuffer();
   const workbook = new ExcelJS.Workbook();
-  
+
   try {
-    await workbook.xlsx.load(buffer);
+    await workbook.xlsx.load(arrayBuffer);
   } catch (e) {
     return { error: "Fichier Excel invalide." };
   }
@@ -27,24 +27,40 @@ export async function previewExcelImport(formData: FormData) {
   const worksheet = workbook.getWorksheet(1);
   if (!worksheet) return { error: "La feuille de calcul est vide." };
 
+  // جلب البيانات للمقارنة الذكية (الموردين، والفواتير)
   const fournisseurs = await prisma.fournisseur.findMany({ select: { id: true, nom: true } });
-  const fournisseurMap = new Map(fournisseurs.map(f => [f.nom.toLowerCase(), f.id]));
+  const fournisseurMap = new Map(fournisseurs.map(f => [f.nom.toLowerCase().trim(), f.id]));
 
+  const factures = await prisma.facture.findMany({ select: { id: true, numero: true, fournisseurId: true } });
+  
   const validRows: any[] = [];
   const errors: { line: number; message: string }[] = [];
 
   worksheet.eachRow((row, rowNumber) => {
-    if (rowNumber === 1) return;
+    if (rowNumber === 1) return; // تخطي رأس الجدول
     
+    // الأعمدة المتوقعة: N° Chèque | Fournisseur | N° Facture | Montant | Date Emission | Type | Référence | Date Encaissement
     const numeroCheque = row.getCell(1).value?.toString().trim();
     const fournisseurName = row.getCell(2).text?.trim();
-    const montantRaw = row.getCell(3).value;
-    const rawDateCreation = row.getCell(4).value;
-    const rawType = row.getCell(5).text?.trim().toUpperCase();
-    const reference = row.getCell(6).text?.trim() || null;
-    const rawDateDecaissement = row.getCell(7).value;
+    const numeroFacture = row.getCell(3).text?.trim();
+    const montantRaw = row.getCell(4).value;
+    const rawDateCreation = row.getCell(5).value;
+    const rawType = row.getCell(6).text?.trim().toUpperCase();
+    const reference = row.getCell(7).text?.trim() || null;
+    const rawDateDecaissement = row.getCell(8).value;
 
     const fournisseurId = fournisseurName ? fournisseurMap.get(fournisseurName.toLowerCase()) : null;
+
+    let factureId = null;
+    if (numeroFacture && fournisseurId) {
+       const facture = factures.find(f => f.numero.toLowerCase().trim() === numeroFacture.toLowerCase() && f.fournisseurId === fournisseurId);
+       if (facture) {
+           factureId = facture.id;
+       } else {
+           errors.push({ line: rowNumber, message: `La Facture '${numeroFacture}' n'appartient pas au fournisseur '${fournisseurName}' ou n'existe pas.` });
+           return; 
+       }
+    }
 
     let dateCreation: Date | null = null;
     if (rawDateCreation instanceof Date) dateCreation = rawDateCreation;
@@ -55,7 +71,7 @@ export async function previewExcelImport(formData: FormData) {
     else if (typeof rawDateDecaissement === 'string' && rawDateDecaissement.trim() !== '' && !isNaN(new Date(rawDateDecaissement).getTime())) dateDecaissement = new Date(rawDateDecaissement);
 
     const montant = Number(montantRaw);
-    const type: ChequeType = rawType === 'SIMPLE' ? 'SIMPLE' : 'BANQUE'; // Par défaut BANQUE
+    const type: ChequeType = rawType === 'SIMPLE' ? 'SIMPLE' : 'BANQUE'; 
 
     if (!numeroCheque) {
       errors.push({ line: rowNumber, message: "Le Numéro du chèque est obligatoire." });
@@ -64,11 +80,11 @@ export async function previewExcelImport(formData: FormData) {
     } else if (!fournisseurId) {
       errors.push({ line: rowNumber, message: `Fournisseur '${fournisseurName}' introuvable dans la base.` });
     } else if (!dateCreation) {
-      errors.push({ line: rowNumber, message: "Date d'émission invalide." });
+      errors.push({ line: rowNumber, message: "Date d&aposémission invalide." });
     } else if (isNaN(montant) || montant <= 0) {
       errors.push({ line: rowNumber, message: "Le montant doit être un nombre positif." });
     } else {
-      validRows.push({ numeroCheque, fournisseurId, montant, dateCreation, type, reference, dateDecaissement });
+      validRows.push({ numeroCheque, fournisseurId, factureId, montant, dateCreation, type, reference, dateDecaissement });
     }
   });
 
@@ -83,34 +99,81 @@ export async function confirmImport(validRows: any[]) {
   let successCount = 0;
   const dbErrors: string[] = [];
 
+  // 💡 Optimization: جمع الـ IDs باش نديرو Sync ضربة وحدة مع اللخر
+  const affectedFactures = new Set<string>();
+  const affectedFournisseurs = new Set<string>();
+
   for (const row of validRows) {
     try {
       await prisma.cheque.create({ 
         data: { 
           numeroCheque: row.numeroCheque,
           fournisseurId: row.fournisseurId,
+          factureId: row.factureId,
           montant: row.montant,
           dateCreation: new Date(row.dateCreation), 
           type: row.type,
           reference: row.reference,
-          dateDecaissement: row.dateDecaissement ? new Date(row.dateDecaissement) : null
+          dateDecaissement: row.dateDecaissement ? new Date(row.dateDecaissement) : null,
+          statut: row.dateDecaissement ? 'DECAISSE' : 'EN_CIRCULATION'
         } 
       });
       successCount++;
+      
+      if (row.factureId) affectedFactures.add(row.factureId);
+      if (row.fournisseurId) affectedFournisseurs.add(row.fournisseurId);
+
     } catch (e) {
-      dbErrors.push(`Erreur d'insertion pour le chèque N°${row.numeroCheque}.`);
+      dbErrors.push(`Erreur d&aposinsertion pour le chèque N°${row.numeroCheque}.`);
     }
   }
 
+  // ==========================================
+  // 💡 BATCH SYNC: تحديث الفواتير والموردين دفعة واحدة
+  // ==========================================
   if (successCount > 0) {
+    // 1. Sync Factures
+    for (const fId of affectedFactures) {
+      const facture = await prisma.facture.findUnique({
+        where: { id: fId },
+        include: { cheques: { where: { statut: { not: 'ANNULE' } } } }
+      });
+      if (facture) {
+        const totalPaye = facture.cheques.reduce((sum, c) => sum + Number(c.montant), 0);
+        const montantF = Number(facture.montant);
+        let pourcentage = montantF > 0 ? (totalPaye / montantF) * 100 : 0;
+        pourcentage = Math.min(Math.max(pourcentage, 0), 100);
+
+        let statut: 'PAYEE' | 'PARTIELLEMENT_PAYEE' | 'EN_ATTENTE' = 'EN_ATTENTE';
+        if (pourcentage >= 100) statut = 'PAYEE';
+        else if (pourcentage > 0) statut = 'PARTIELLEMENT_PAYEE';
+
+        await prisma.facture.update({ where: { id: fId }, data: { pourcentage, statut } });
+      }
+    }
+
+    // 2. Sync Fournisseurs (Cumul)
+    for (const frId of affectedFournisseurs) {
+      const validCheques = await prisma.cheque.aggregate({
+        where: { fournisseurId: frId, statut: { not: 'ANNULE' } },
+        _sum: { montant: true }
+      });
+      await prisma.fournisseur.update({
+        where: { id: frId },
+        data: { cumulMontant: validCheques._sum.montant || 0 }
+      });
+    }
+
     await writeAudit({
       action: 'IMPORT',
       entity: 'Cheque',
-      description: `Import Excel : ${successCount} chèques ajoutés.`,
+      description: `Import Excel : ${successCount} chèques ajoutés avec synchronisation financière.`,
       userId: session?.userId,
       username: session?.username,
     });
     revalidatePath('/cheques');
+    revalidatePath('/factures');
+    revalidatePath('/fournisseurs');
   }
 
   return { successCount, dbErrors };

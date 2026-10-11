@@ -122,7 +122,7 @@ export async function deleteRole(id: string) {
       action: 'DELETE',
       entity: 'Role',
       entityId: id,
-      description: `Suppression d'un rôle`,
+      description: `Suppression d&aposun rôle`,
       userId: session?.userId,
       username: session?.username,
     });

@@ -12,6 +12,18 @@ enum ChequeType {
   SIMPLE
 }
 
+enum ChequeStatut {
+  EN_CIRCULATION
+  DECAISSE
+  ANNULE
+}
+
+enum FactureStatut {
+  EN_ATTENTE
+  PARTIELLEMENT_PAYEE
+  PAYEE
+}
+
 enum FraisType {
   TAX
   VIREMENT
@@ -30,50 +42,133 @@ enum AuditAction {
   BLOCK
   UNBLOCK
   ACTIVATE_SOLDE
+  CANCEL // لإلغاء شيك
+  REACTIVATE // لإعادة تفعيل شيك ملغى
+  RENEW // لتجديد عقد
 }
 
 // --- MODELS (الجداول) ---
 
 model User {
-  id                   String    @id @default(cuid())
-  username             String    @unique
-  email                String?
-  passwordHash         String
-  fullName             String
-  isBlocked            Boolean   @default(false)
-  failedLoginAttempts  Int       @default(0)
-  lockedUntil          DateTime?
-  mustChangePassword   Boolean   @default(true)
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  id                  String    @id @default(cuid())
+  username            String    @unique
+  email               String?
+  passwordHash        String
+  fullName            String
+  isBlocked           Boolean   @default(false)
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  mustChangePassword  Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
-  roles                Role[]    // علاقة متعدد لمتعدد مع الأدوار
-  auditLogs            AuditLog[]
+  roles     Role[]
+  auditLogs AuditLog[]
 }
 
 model Role {
   id          String       @id @default(cuid())
   name        String       @unique
   description String?
-  users       User[]       
-  permissions Permission[] 
+  users       User[]
+  permissions Permission[]
 }
 
 model Permission {
-  id       String  @id @default(cuid())
-  code     String  @unique // مثال: "cheque:create"
+  id       String @id @default(cuid())
+  code     String @unique
   label    String
   resource String
-  roles    Role[]  
+  roles    Role[]
 }
 
 model Fournisseur {
-  id        String   @id @default(cuid())
-  nom       String   @unique
-  activite  String?
+  id       String  @id @default(cuid())
+  nom      String  @unique
+  activite String?
+
+  // -- العتبة والمبلغ المتراكم --
+  cumulMontant Decimal  @default(0) @db.Decimal(15, 2)
+  seuil        Decimal? @db.Decimal(15, 2)
+  seuilActive  Boolean  @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  cheques   Cheque[]
+
+  cheques      Cheque[]
+  bonCommandes BonCommande[]
+  contrats     Contrat[]
+  factures     Facture[]
+}
+
+model BonCommande {
+  id          String   @id @default(cuid())
+  numero      String   @unique
+  designation String?
+  date        DateTime @db.Date
+  montant     Decimal  @db.Decimal(15, 2)
+
+  fournisseurId String
+  fournisseur   Fournisseur @relation(fields: [fournisseurId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  factures Facture[]
+}
+
+model Contrat {
+  id          String    @id @default(cuid())
+  numero      String    @unique
+  designation String?
+  date        DateTime  @db.Date
+  dateFin     DateTime? @db.Date
+  montant     Decimal   @db.Decimal(15, 2)
+
+  // -- الجديد: الاستهلاك الأولي، العتبة والتجديد --
+  montantConsommeInitial Decimal  @default(0) @db.Decimal(15, 2) // <--- أضفنا هذا الحقل لحساب الفواتير القديمة
+  seuil                  Decimal? @db.Decimal(15, 2)
+  seuilActive            Boolean  @default(false)
+  isActive               Boolean  @default(true)
+
+  parentId String? // للاحتفاظ بالعقد القديم عند التجديد
+  parent   Contrat?  @relation("ContratRenewal", fields: [parentId], references: [id])
+  renewals Contrat[] @relation("ContratRenewal")
+
+  fournisseurId String
+  fournisseur   Fournisseur @relation(fields: [fournisseurId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  factures Facture[]
+}
+
+model Facture {
+  id          String   @id @default(cuid())
+  numero      String   @unique
+  designation String?
+  description String?  @db.Text
+  date        DateTime @db.Date
+  montant     Decimal  @db.Decimal(15, 2)
+
+  // -- حالة الدفع --
+  statut      FactureStatut @default(EN_ATTENTE)
+  pourcentage Decimal       @default(0) @db.Decimal(5, 2) // نسبة الدفع %
+
+  fournisseurId String
+  fournisseur   Fournisseur @relation(fields: [fournisseurId], references: [id], onDelete: Cascade)
+
+  bonCommandeId String?
+  bonCommande   BonCommande? @relation(fields: [bonCommandeId], references: [id], onDelete: Cascade)
+
+  contratId String?
+  contrat   Contrat? @relation(fields: [contratId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cheques Cheque[]
 }
 
 model Client {
@@ -85,34 +180,45 @@ model Client {
 }
 
 model Cheque {
-  id               String      @id @default(cuid())
+  id               String     @id @default(cuid())
   numeroCheque     String
-  montant          Decimal     @db.Decimal(15, 2)
+  montant          Decimal    @db.Decimal(15, 2)
   reference        String?
-  dateCreation     DateTime    @db.Date
-  dateDecaissement DateTime?   @db.Date
+  dateCreation     DateTime   @db.Date
+  dateDecaissement DateTime?  @db.Date
   type             ChequeType
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
 
-  fournisseurId    String
-  fournisseur      Fournisseur @relation(fields: [fournisseurId], references: [id])
+  // -- الإلغاء والتعليق والربط بالفاتورة --
+  statut         ChequeStatut @default(EN_CIRCULATION)
+  dateAnnulation DateTime?    @db.Date
+  commentaire    String?      @db.Text
+
+  factureId String?
+  facture   Facture? @relation(fields: [factureId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  fournisseurId String
+  fournisseur   Fournisseur @relation(fields: [fournisseurId], references: [id])
 
   @@index([dateCreation])
   @@index([dateDecaissement])
   @@index([fournisseurId])
+  @@index([factureId])
 }
 
 model Encaissement {
   id               String    @id @default(cuid())
   montant          Decimal   @db.Decimal(15, 2)
+  reference        String?
   dateCreation     DateTime  @db.Date
   dateEncaissement DateTime? @db.Date
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  clientId         String
-  client           Client    @relation(fields: [clientId], references: [id])
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id])
 
   @@index([dateCreation])
   @@index([dateEncaissement])
@@ -120,13 +226,17 @@ model Encaissement {
 }
 
 model LigneCredit {
-  id           String   @id @default(cuid())
-  montant      Decimal  @db.Decimal(15, 2)
-  dateCreation DateTime @db.Date
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id           String    @id @default(cuid())
+  montant      Decimal   @db.Decimal(15, 2)
+  dateCreation DateTime  @db.Date
+  dateFin      DateTime? @db.Date
+  isActive     Boolean   @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([dateCreation])
+  @@index([isActive])
 }
 
 model Frais {
@@ -163,11 +273,11 @@ model AuditLog {
   after       Json?
   ipAddress   String?
   userAgent   String?
-  username    String? // نحتفظ باسم المستخدم حتى لو تم حذفه لاحقاً
+  username    String?
   createdAt   DateTime    @default(now())
 
-  userId      String?
-  user        User?       @relation(fields: [userId], references: [id])
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
 
   @@index([createdAt])
   @@index([userId])

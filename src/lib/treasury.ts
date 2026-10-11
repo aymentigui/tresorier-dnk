@@ -7,41 +7,57 @@ export async function getTreasuryStats() {
     orderBy: { dateCreation: 'desc' }
   });
 
+  // 2. نجيبو خط الائتمان (مستقل عن تاريخ الرصيد)
+  // الشرط: مفعل (isActive = true) وتاريخ نهايته أكبر من أو يساوي تاريخ اليوم
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const activeCredit = await prisma.ligneCredit.findFirst({
+    where: { 
+      isActive: true,
+      dateFin: { gte: today } 
+    },
+    orderBy: { dateCreation: 'desc' } // نجيبو الأحدث
+  });
+  
+  const totalCredits = activeCredit ? Number(activeCredit.montant) : 0;
+
   if (!activeSolde) {
     return {
       hasActiveSolde: false,
       soldeActuel: 0,
       dateSolde: null,
-      disponibilite: 0,
+      // إذا ماكانش رصيد بنكي مدخل، السيولة هي نفسها مبلغ خط الائتمان (إن وجد)
+      disponibilite: totalCredits, 
     };
   }
 
   const soldeDate = activeSolde.dateCreation;
   const soldeMontant = Number(activeSolde.montant);
 
-  // 2. Chèques en circulation ET après solde
+  // 3. تطبيق القاعدة الذهبية للشيكات:
+  // - TOUS les chèques en circulation (avant ou après SB)
+  // - Les chèques décaissés APRÈS (SB)
   const cheques = await prisma.cheque.aggregate({
     where: {
-      dateDecaissement: null,
-      dateCreation: { gt: soldeDate }
+      OR: [
+        { statut: 'EN_CIRCULATION' }, // كل الشيكات العالقة
+        { 
+          statut: 'DECAISSE', 
+          dateDecaissement: { gt: soldeDate } // الشيكات المصروفة بعد تاريخ الرصيد
+        }
+      ]
     },
     _sum: { montant: true }
   });
-  const totalCheques = Number(cheques._sum.montant || 0);
+  const totalChequesADeduire = Number(cheques._sum.montant || 0);
 
-  // 3. Frais après solde
+  // 4. Frais après solde
   const frais = await prisma.frais.aggregate({
     where: { dateCreation: { gt: soldeDate } },
     _sum: { montant: true }
   });
   const totalFrais = Number(frais._sum.montant || 0);
-
-  // 4. Lignes de crédit après solde
-  const credits = await prisma.ligneCredit.aggregate({
-    where: { dateCreation: { gt: soldeDate } },
-    _sum: { montant: true }
-  });
-  const totalCredits = Number(credits._sum.montant || 0);
 
   // 5. Encaissements après solde
   const encaissements = await prisma.encaissement.aggregate({
@@ -51,7 +67,8 @@ export async function getTreasuryStats() {
   const totalEncaissements = Number(encaissements._sum.montant || 0);
 
   // 6. حساب السيولة (Disponibilité)
-  const disponibilite = soldeMontant - totalCheques - totalFrais + totalCredits + totalEncaissements;
+  // الرصيد + خط الائتمان + التحصيلات - الشيكات (العالقة + المصروفة بعد الرصيد) - المصاريف
+  const disponibilite = soldeMontant + totalCredits + totalEncaissements - totalChequesADeduire - totalFrais;
 
   return {
     hasActiveSolde: true,

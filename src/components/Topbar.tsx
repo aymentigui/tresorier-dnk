@@ -6,7 +6,10 @@ import { usePathname } from 'next/navigation';
 import { 
   Bell, Menu, LogOut, LayoutDashboard, Wallet, Receipt, CreditCard, 
   ArrowDownToLine, ArrowUpFromLine, Users, Building2, 
-  ShieldCheck, UserCog, History 
+  ShieldCheck, UserCog, History, 
+  FileText,
+  FileSignature,
+  List
 } from 'lucide-react';
 import { logoutAction } from '@/app/actions/auth';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
@@ -25,10 +28,14 @@ export default function Topbar({ user }: { user: { username: string } }) {
       title: "Trésorerie",
       items: [
         { name: "Soldes bancaires", href: "/soldes", icon: Wallet },
-        { name: "Chèques", href: "/cheques", icon: Receipt },
+        { name: "Chèques", href: "/cheques", icon: CreditCard },
         { name: "Encaissements", href: "/encaissements", icon: ArrowDownToLine },
         { name: "Lignes de crédit", href: "/lignes-credit", icon: ArrowUpFromLine },
-        { name: "Frais & Taxes", href: "/frais", icon: CreditCard },
+        { name: "Frais & Taxes", href: "/frais", icon: List },
+        { name: "Bons de Commande", href: "/bons-commande", icon: FileText },
+        { name: 'Soldes bancaires', href: '/soldes', icon: FileText },
+        { name: "Contrats", href: "/contrats", icon: FileSignature },
+        { name: "Factures", href: "/factures", icon: Receipt },
       ]
     },
     {
@@ -43,7 +50,7 @@ export default function Topbar({ user }: { user: { username: string } }) {
       items: [
         { name: "Utilisateurs", href: "/utilisateurs", icon: UserCog },
         { name: "Rôles & Permissions", href: "/roles", icon: ShieldCheck },
-        { name: "Journal d'audit", href: "/logs", icon: History },
+        { name: "Journal d&aposaudit", href: "/logs", icon: History },
       ]
     }
   ];
@@ -54,10 +61,8 @@ export default function Topbar({ user }: { user: { username: string } }) {
         
         {/* قائمة الموبايل (Sheet) */}
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
-          <SheetTrigger asChild>
-            <button className="md:hidden p-2 text-slate-500 hover:bg-slate-100 rounded-lg">
-              <Menu size={20} />
-            </button>
+          <SheetTrigger className="md:hidden p-2 text-slate-500 hover:bg-slate-100 rounded-lg">
+            <Menu size={20} />
           </SheetTrigger>
           <SheetContent side="left" className="w-64 p-0 bg-slate-900 text-slate-300 border-none flex flex-col">
             <SheetTitle className="sr-only">Menu de navigation</SheetTitle>

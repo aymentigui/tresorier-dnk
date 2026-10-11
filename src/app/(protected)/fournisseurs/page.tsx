@@ -4,32 +4,36 @@ import FournisseursClient from './FournisseursClient';
 export default async function FournisseursPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; search?: string }>;
+  searchParams: Promise<any>;
 }) {
-  // Await searchParams for Next.js 15+
   const resolvedParams = await searchParams;
   const page = Number(resolvedParams?.page) || 1;
-  const search = resolvedParams?.search || '';
   
-  // نعيطو للـ Backend باش نجيبو البيانات
-  const { data, total, totalPages } = await getFournisseurs(page, search, 10);
+  const filters = {
+    page, limit: 10,
+    search: resolvedParams?.search || '',
+    activite: resolvedParams?.activite || '',
+    alerteSeuil: resolvedParams?.alerteSeuil || '',
+  };
+  
+  const result = await getFournisseurs(filters);
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Fournisseurs</h1>
-          <p className="text-slate-500 mt-1">Gérez vos fournisseurs et leurs activités.</p>
+          <h1 className="text-2xl font-bold text-slate-900">Fournisseurs & Analyse</h1>
+          <p className="text-slate-500 mt-1">Gérez vos fournisseurs, analysez les seuils d&aposalerte et importez depuis Excel.</p>
         </div>
       </div>
       
-      {/* نبعتو البيانات للمكون تاع الواجهة اللي راح نخدموه في الخطوة 4 */}
       <FournisseursClient 
-        initialData={data} 
-        total={total} 
-        totalPages={totalPages} 
+        initialData={result.data as any} 
+        summary={result.summary}
+        total={result.total} 
+        totalPages={result.totalPages} 
         currentPage={page} 
-        currentSearch={search} 
+        currentFilters={filters}
       />
     </div>
   );

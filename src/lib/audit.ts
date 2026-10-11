@@ -34,6 +34,6 @@ export async function writeAudit({
       },
     });
   } catch (error) {
-    console.error("Erreur lors de la création de l'AuditLog:", error);
+    console.error("Erreur lors de la création de l&aposauditLog:", error);
   }
 }

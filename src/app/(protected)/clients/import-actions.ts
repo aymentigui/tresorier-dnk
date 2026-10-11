@@ -14,11 +14,11 @@ export async function previewExcelImport(formData: FormData) {
   const file = formData.get('file') as File;
   if (!file) return { error: "Aucun fichier sélectionné." };
 
-  const buffer = Buffer.from(await file.arrayBuffer());
+  const arrayBuffer = await file.arrayBuffer();
   const workbook = new ExcelJS.Workbook();
-  
+
   try {
-    await workbook.xlsx.load(buffer);
+    await workbook.xlsx.load(arrayBuffer);
   } catch (e) {
     return { error: "Fichier Excel invalide." };
   }
@@ -64,7 +64,7 @@ export async function confirmImport(validRows: { nom: string }[]) {
         dbErrors.push(`Le client "${row.nom}" existe déjà.`);
       }
     } catch (e) {
-      dbErrors.push(`Erreur d'insertion pour "${row.nom}".`);
+      dbErrors.push(`Erreur d&aposinsertion pour "${row.nom}".`);
     }
   }
 

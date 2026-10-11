@@ -16,7 +16,7 @@ export default async function LignesCreditPage({
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Lignes de crédit</h1>
-          <p className="text-slate-500 mt-1">Gérez vos entrées de fonds et lignes de crédit.</p>
+          <p className="text-slate-500 mt-1">Gérez vos entrées de fonds et lignes de crédit (avec activation et expiration).</p>
         </div>
       </div>
       

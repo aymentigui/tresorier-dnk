@@ -13,6 +13,7 @@ const encaissementSchema = z.object({
   clientId: z.string().min(1, "Veuillez sélectionner un client"),
   dateCreation: z.string().min(1, "La date de création est requise"),
   dateEncaissement: z.string().optional(),
+  reference: z.string().optional().nullable(),
 });
 
 // جلب العملاء للقائمة المنسدلة
@@ -108,6 +109,7 @@ export async function createEncaissement(formData: FormData) {
         clientId: validation.data.clientId,
         dateCreation: new Date(validation.data.dateCreation),
         dateEncaissement: validation.data.dateEncaissement ? new Date(validation.data.dateEncaissement) : null,
+        reference: validation.data.reference || null,
       }
     });
 
@@ -115,7 +117,7 @@ export async function createEncaissement(formData: FormData) {
       action: 'CREATE',
       entity: 'Encaissement',
       entityId: newEncaissement.id,
-      description: `Création d'un encaissement de ${validation.data.montant} DA`,
+      description: `Création d&aposun encaissement de ${validation.data.montant} DA`,
       userId: session?.userId,
       username: session?.username,
       after: newEncaissement
@@ -150,6 +152,7 @@ export async function updateEncaissement(id: string, formData: FormData) {
         clientId: validation.data.clientId,
         dateCreation: new Date(validation.data.dateCreation),
         dateEncaissement: validation.data.dateEncaissement ? new Date(validation.data.dateEncaissement) : null,
+        reference: validation.data.reference || null,
       }
     });
 
@@ -157,7 +160,7 @@ export async function updateEncaissement(id: string, formData: FormData) {
       action: 'UPDATE',
       entity: 'Encaissement',
       entityId: id,
-      description: `Modification de l'encaissement`,
+      description: `Modification de l&aposencaissement`,
       userId: session?.userId,
       username: session?.username,
       before: oldData,
@@ -187,7 +190,7 @@ export async function deleteEncaissement(id: string) {
       action: 'DELETE',
       entity: 'Encaissement',
       entityId: id,
-      description: `Suppression d'un encaissement`,
+      description: `Suppression d&aposun encaissement`,
       userId: session?.userId,
       username: session?.username,
       before: oldData

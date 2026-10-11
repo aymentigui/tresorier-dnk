@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 
 const features = tableFeatures({});
 
-type Role = { id: string; name: string; code: string; };
+type Role = { id: string; name: string; description?: string | null; };
 
 type User = {
   id: string;
@@ -236,7 +236,7 @@ export default function UtilisateursClient({
           <form onSubmit={handleSubmit} className="space-y-4 mt-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">name d'utilisateur *</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">name d&aposutilisateur *</label>
                 <Input id="username" name="username" required placeholder="ex: admin" />
               </div>
               <div>

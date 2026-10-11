@@ -193,7 +193,7 @@ export default function SoldesClient({
               <Input type="number" step="0.01" id="montant" name="montant" required placeholder="Ex: 12450000" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Date de l'arrêté</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Date de l&aposarrêté</label>
               <Input type="date" id="dateCreation" name="dateCreation" required defaultValue={new Date().toISOString().split('T')[0]} />
             </div>
             <div className="bg-blue-50 text-blue-800 text-xs p-3 rounded-md mt-2 border border-blue-100">

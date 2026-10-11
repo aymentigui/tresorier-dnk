@@ -63,7 +63,7 @@ export async function createUser(formData: FormData) {
 
   try {
     const exists = await prisma.user.findUnique({ where: { username } });
-    if (exists) return { error: "Ce nom d'utilisateur existe déjà." };
+    if (exists) return { error: "Ce nom d&aposutilisateur existe déjà." };
 
     const passwordHash = await bcrypt.hash(password, 10);
 
@@ -82,7 +82,7 @@ export async function createUser(formData: FormData) {
       action: 'CREATE',
       entity: 'User',
       entityId: newUser.id,
-      description: `Création de l'utilisateur: ${username}`,
+      description: `Création de l&aposutilisateur: ${username}`,
       userId: session?.userId,
       username: session?.username,
     });
@@ -90,7 +90,7 @@ export async function createUser(formData: FormData) {
     revalidatePath('/utilisateurs');
     return { success: true };
   } catch (error) {
-    return { error: "Erreur lors de la création de l'utilisateur." };
+    return { error: "Erreur lors de la création de l&aposutilisateur." };
   }
 }
 
@@ -131,7 +131,7 @@ export async function updateUser(id: string, formData: FormData) {
       action: 'UPDATE',
       entity: 'User',
       entityId: id,
-      description: `Modification de l'utilisateur: ${username}`,
+      description: `Modification de l&aposutilisateur: ${username}`,
       userId: session?.userId,
       username: session?.username,
     });
@@ -163,7 +163,7 @@ export async function toggleBlockUser(id: string, isBlocked: boolean) {
       action: isBlocked ? 'BLOCK' : 'UNBLOCK',
       entity: 'User',
       entityId: id,
-      description: `${isBlocked ? 'Blocage' : 'Déblocage'} de l'utilisateur: ${updated.username}`,
+      description: `${isBlocked ? 'Blocage' : 'Déblocage'} de l&aposutilisateur: ${updated.username}`,
       userId: session?.userId,
       username: session?.username,
     });
@@ -171,7 +171,7 @@ export async function toggleBlockUser(id: string, isBlocked: boolean) {
     revalidatePath('/utilisateurs');
     return { success: true };
   } catch (error) {
-    return { error: "Erreur lors de l'opération." };
+    return { error: "Erreur lors de l&aposopération." };
   }
 }
 
@@ -195,7 +195,7 @@ export async function deleteUser(id: string) {
       action: 'DELETE',
       entity: 'User',
       entityId: id,
-      description: `Suppression de l'utilisateur: ${oldData.username}`,
+      description: `Suppression de l&aposutilisateur: ${oldData.username}`,
       userId: session?.userId,
       username: session?.username,
     });

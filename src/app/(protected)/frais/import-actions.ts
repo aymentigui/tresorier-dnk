@@ -15,17 +15,29 @@ export async function previewExcelImport(formData: FormData) {
   const file = formData.get('file') as File;
   if (!file) return { error: "Aucun fichier sélectionné." };
 
-  const buffer = Buffer.from(await file.arrayBuffer());
+  const arrayBuffer = await file.arrayBuffer();
   const workbook = new ExcelJS.Workbook();
-  
+
   try {
-    await workbook.xlsx.load(buffer);
+    await workbook.xlsx.load(arrayBuffer);
   } catch (e) {
     return { error: "Fichier Excel invalide." };
   }
 
   const worksheet = workbook.getWorksheet(1);
   if (!worksheet) return { error: "La feuille de calcul est vide." };
+
+  // 💡 الحماية القصوى ضد التكرار (Anti-Double Booking)
+  // جلب المصاريف الموجودة لإنشاء "بصمة" لكل مصروف
+  const fraisExistants = await prisma.frais.findMany({
+    select: { dateCreation: true, nom: true, type: true, montant: true }
+  });
+  
+  const existingSet = new Set(
+    fraisExistants.map(f => 
+      `${f.dateCreation.toISOString().split('T')[0]}|${f.nom.toLowerCase().trim()}|${f.type}|${Number(f.montant)}`
+    )
+  );
 
   const validRows: { dateCreation: Date; nom: string; type: FraisType; montant: number }[] = [];
   const errors: { line: number; message: string }[] = [];
@@ -58,7 +70,15 @@ export async function previewExcelImport(formData: FormData) {
     } else if (isNaN(montant) || montant <= 0) {
       errors.push({ line: rowNumber, message: "Le montant doit être un nombre positif." });
     } else {
-      validRows.push({ dateCreation, nom, type, montant });
+      // بناء بصمة السطر الحالي
+      const rowKey = `${dateCreation.toISOString().split('T')[0]}|${nom.toLowerCase()}|${type}|${montant}`;
+
+      if (existingSet.has(rowKey)) {
+        errors.push({ line: rowNumber, message: `Double Saisie : Ce frais (${nom} de ${montant} DA) existe déjà à cette date.` });
+      } else {
+        validRows.push({ dateCreation, nom, type, montant });
+        existingSet.add(rowKey); // 💡 إضافة البصمة لمنع التكرار داخل نفس الملف
+      }
     }
   });
 
@@ -85,7 +105,7 @@ export async function confirmImport(validRows: { dateCreation: Date; nom: string
       });
       successCount++;
     } catch (e) {
-      dbErrors.push(`Erreur d'insertion pour "${row.nom}".`);
+      dbErrors.push(`Erreur d&aposinsertion pour "${row.nom}".`);
     }
   }
 

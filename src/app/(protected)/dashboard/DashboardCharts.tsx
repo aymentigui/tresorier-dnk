@@ -29,7 +29,14 @@ export function RepartitionChart({ data }: { data: any[] }) {
               <Cell key={`cell-${index}`} fill={entry.fill} />
             ))}
           </Pie>
-          <Tooltip formatter={(value: number) => new Intl.NumberFormat('fr-DZ', { style: 'currency', currency: 'DZD' }).format(value)} />
+          <Tooltip
+            formatter={(value) =>
+              new Intl.NumberFormat('fr-DZ', {
+                style: 'currency',
+                currency: 'DZD',
+              }).format(Number(value ?? 0))
+            }
+          />
         </PieChart>
       </ResponsiveContainer>
     </div>
